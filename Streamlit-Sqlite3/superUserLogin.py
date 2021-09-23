@@ -5,14 +5,42 @@ conn = sql.connect('file:auth.db?mode=ro', uri=True)
 connect = conn.cursor()
 
 
-def _login_user(username, password, status):
+def _login_user(username_, password_, status_):
     connect.execute('SELECT * FROM users WHERE username =? AND password =? AND status =?',
-                    (username, password, status))
+                    (username_, password_, status_))
     data = connect.fetchall()
     return data
 
 
+def _create_users(connect, init_user='', init_pass='', init_status='', init_super=False):
+    user_ = st.text_input('Enter Username', value=init_user)
+    pass_ = st.text_input('Enter Password (required)', value=init_pass)
+    status_ = st.text_input('Enter Status', value=init_status)
+    super_ = st.checkbox('Is this a superuser?', value=init_super)
+    if st.button('Update Database') and user_ and pass_:
+        with connect:
+            connect.execute(
+                'INSERT INTO users(username,password,status,su) VALUES(?,?,?,?)',
+                (user_, pass_, status_, super_),
+            )
+            st.text('Database Updated')
+
+
 def _list_users(connect):
+    table_data = connect.execute('SELECT username,status FROM users').fetchall()
+    if table_data:
+        table_data2 = list(zip(*table_data))
+        st.table(
+            {
+                'Username': table_data2[0],
+                'Status': table_data2[1],
+            }
+        )
+    else:
+        st.write('No entries in authentication database')
+
+
+def _list_super_users(connect):
     table_data = connect.execute('SELECT username,password,status,su FROM users').fetchall()
     if table_data:
         table_data2 = list(zip(*table_data))
@@ -26,20 +54,6 @@ def _list_users(connect):
         )
     else:
         st.write('No entries in authentication database')
-
-
-def _create_users(connect, init_user='', init_pass='', init_status='', init_super=False):
-    user_ = st.text_input('Enter Username', value=init_user)
-    pass_ = st.text_input('Enter Password (required)', value=init_pass)
-    status_ = st.text_input('Enter Status', value=init_status)
-    super_ = st.checkbox('Is this a superuser?', value=init_super)
-    if st.button('Update Database') and user_ and pass_:
-        with connect:
-            connect.execute(
-                'INSERT INTO USERS(username, password, su) VALUES(?,?,?,?)',
-                (user_, pass_, status_, super_),
-            )
-            st.text('Database Updated')
 
 
 def _edit_users(connect):
@@ -76,7 +90,7 @@ def _superuser_mode():
             'CREATE TABLE IF NOT EXISTS USERS (id INTEGER PRIMARY KEY, username UNIQUE ON CONFLICT REPLACE, password, status, su)'
         )
         modes = {
-            'View': _list_users,
+            'View': _list_super_users,
             'Create': _create_users,
             'Edit': _edit_users,
             'Delete': _delete_users,
@@ -98,16 +112,17 @@ def _user_mode():
 
 
 if __name__ == '__main__':
-    st.write(
-        'Warning, superuser mode\n\n'
-    )
-    mainMenu = ['Login']
+    mainMenu = ['SignUp', 'Login']
     choice = st.sidebar.selectbox('🔐 User Zone', mainMenu)
-    username = st.sidebar.text_input('Username')
-    password = st.sidebar.text_input('Password', type='password')
-    status = st.sidebar.selectbox('Status', ('Super User', 'User'))
+    if choice == 'Login':
+        username = st.sidebar.text_input('Username')
+        password = st.sidebar.text_input('Password', type='password')
+        status = st.sidebar.selectbox('Status', ('Super User', 'User'))
 
-    if st.sidebar.checkbox('Login'):
+    if choice == 'SignUp':
+        st.info('Go to Login Menu to login')
+
+    elif st.sidebar.checkbox('Login'):
         result = _login_user(username, password, status)
         if result:
             st.sidebar.success('Logged In as {}'.format(username))
